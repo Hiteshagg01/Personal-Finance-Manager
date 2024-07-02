@@ -4,6 +4,7 @@ import sequelize from "../config/sequelize.js";
 export default sequelize.define("Budget", {
   user_id: {
     type: DataTypes.INTEGER,
+    allowNull: false,
     references: {
       model: "Users",
       key: "id",

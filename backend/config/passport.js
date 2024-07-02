@@ -1,6 +1,9 @@
 import passport from "passport";
 import LocalStrategy from "passport-local";
+import GoogleStrategy from "passport-google-oauth20";
 import bcrypt from "bcrypt";
+import "dotenv/config";
+import { Op } from "sequelize";
 
 import { User } from "../models/index.js";
 
@@ -9,22 +12,25 @@ passport.use(
   new LocalStrategy(async (username, password, cb) => {
     try {
       const foundUser = await User.findOne({
-        // attributes: ["firstName", "username", "password", "email"],
         where: {
           username: username,
         },
       });
 
       if (!foundUser) {
-        cb("username and password does not match. Try again.");
+        cb(null, false, {
+          message: "Username and password does not match. Try again.",
+        });
       } else {
         bcrypt.compare(password, foundUser.dataValues.password, (err, same) => {
           if (err) {
             cb(err);
           } else if (same) {
-            cb(null, foundUser);
+            cb(null, {...foundUser.dataValues, password: null});
           } else {
-            cb("username and password does not match. Try again.");
+            cb(null, false, {
+              message: "Username and password does not match. Try again.",
+            });
           }
         });
       }
@@ -42,9 +48,7 @@ passport.use(
       try {
         const existingUser = await User.findOne({
           attributes: ["firstName", "email"],
-          where: {
-            username: username,
-          },
+          where: { [Op.or]: [{ username }, { email: req.body.email }] },
         });
 
         if (!existingUser) {
@@ -62,16 +66,54 @@ passport.use(
                 password: hash,
                 email,
               });
-              cb(null, newUser);
+              cb(null, {...newUser.dataValues, password: null});
             } catch (error) {
-              cb(error);
+              cb(error.message);
             }
           });
         } else {
-          cb("username already registered, please login");
+          cb(null, false, {
+            message: "Username already registered, please login",
+          });
         }
       } catch (error) {
-        cb("Cannot find user");
+        console.log(error);
+        cb(error.message);
+      }
+    }
+  )
+);
+
+passport.use(
+  "google",
+  new GoogleStrategy(
+    {
+      clientID: process.env.CLIENT_ID,
+      clientSecret: process.env.CLIENT_SECRET,
+      callbackURL: "http://localhost:3000/auth/google/callback",
+      scope: ["profile"],
+    },
+    async (accessToken, refreshToken, profile, cb) => {
+      try {
+        const [user, created] = await User.findOrCreate({
+          where: {
+            [Op.or]: [
+              { username: profile.id },
+              { email: profile.emails[0].value },
+            ],
+          },
+          defaults: {
+            firstName: profile.name.givenName,
+            lastName: profile.name.familyName,
+            username: profile.id,
+            password: "GOOGLE",
+            email: profile.emails[0].value,
+          },
+        });
+
+        return cb(null, user);
+      } catch (error) {
+        cb(error);
       }
     }
   )
@@ -86,48 +128,3 @@ passport.deserializeUser((user, cb) => {
 });
 
 export default passport;
-
-/*
-Vivek Pandey
-17:43
-app.use(passport.initialize());
-app.use(passport.session());
-
-// Passport local strategy
-passport.use(new LocalStrategy((username, password, done) => {
-  if (username === user.username && password === user.password) {
-    return done(null, user);
-  }
-  return done(null, false, { message: 'Incorrect credentials' });
-}));
-
-passport.serializeUser((user, done) => {
-  done(null, user.id);
-});
-
-passport.deserializeUser((id, done) => {
-  if (id === user.id) {
-    done(null, user);
-  } else {
-    done(n
-passport.deserializeUser((id, done) => {
-  if (id === user.id) {
-    done(null, user);
-  } else {
-    done(new Error('User not found'));
-  }
-});
-
-// Routes
-app.post('/login', passport.authenticate('local'), (req, res) => {
-  res.status(200).json({ message: 'Logged in' });
-});
-
-app.get('/logout', (req, res) => {
-  req.logout((err) => {
-    if (err) { return next(err); }
-    res.status(200).json({ message: 'Logged out' });
-  });
-});
-hoh-aowg-ukd
-*/

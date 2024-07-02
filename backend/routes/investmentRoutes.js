@@ -1,37 +1,7 @@
 import express from "express";
 const router = express.Router();
 
-import { Expense } from "../models/index.js";
-
-router.get("/filter", async (req, res) => {
-  if (!req.user.id) {
-    res.status(401).json({ message: "Unauthorized" });
-  }
-
-  const { category } = req.query;
-
-  if (!category) {
-    return res
-      .status(400)
-      .json({ message: "Invalid query, filter by category" });
-  }
-
-  try {
-    const filteredExpenses = await Expense.findAll({
-      where: {
-        user_id: req.user.id,
-        category,
-      },
-    });
-
-    return res.json({ count: filteredExpenses.length, data: filteredExpenses });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({
-      message: `Failed to filter expenses : ${error.message}`,
-    });
-  }
-});
+import { Investment } from "../models/index.js";
 
 router
   .route("/")
@@ -40,17 +10,17 @@ router
       res.status(401).json({ message: "Unauthorized" });
     }
     try {
-      const expenses = await Expense.findAll({
+      const investments = await Investment.findAll({
         where: {
           user_id: req.user.id,
         },
       });
 
-      return res.json({ count: expenses.length, data: expenses });
+      return res.json({ count: investments.length, data: investments });
     } catch (error) {
       console.error(error);
       res.status(500).json({
-        message: `Failed to get budget : ${error.message}`,
+        message: `Failed to get investment : ${error.message}`,
       });
     }
   })
@@ -59,23 +29,24 @@ router
       res.status(401).json({ message: "Unauthorized" });
     }
 
-    const { category, amount, date } = req.body;
+    const { asset_type, amount, purchase_date } = req.body;
 
-    if (!category || !amount || !date) {
+    if (!asset_type || !amount || !purchase_date) {
       return res.status(400).json({
-        message: "Send all required fields (category, amount, date)",
+        message: "Send all required fields (asset type, amount, purchase date)",
       });
     }
 
     // more checks category must be a valid category, amount must be decimal number, dates must be a valid date string
 
     try {
-      const newExpense = await Expense.create(
+      const newInvestment = await Investment.create(
         {
           user_id: req.user.id,
-          category,
+          asset_type,
           amount,
-          date,
+          purchase_date,
+          current_value: req.body.current_value || null,
           description: req.body.description || null,
         },
         {
@@ -83,11 +54,13 @@ router
         }
       );
 
-      res.status(201).json({ message: "Expense Saved", data: newExpense });
+      res
+        .status(201)
+        .json({ message: "Investment Saved", data: newInvestment });
     } catch (error) {
       console.error(error);
       return res.status(500).json({
-        message: `Failed to save expense : ${error.message}`,
+        message: `Failed to save investment : ${error.message}`,
       });
     }
   });
@@ -106,24 +79,24 @@ router
     }
 
     try {
-      const foundExpense = await Expense.findOne({
+      const foundInvestment = await Investment.findOne({
         where: {
           user_id: req.user.id,
           id,
         },
       });
 
-      if (!foundExpense) {
+      if (!foundInvestment) {
         return res
           .status(404)
-          .json({ message: `Expense with id : ${id} not found` });
+          .json({ message: `Investment with id : ${id} not found` });
       }
 
-      res.json(foundExpense);
+      res.json(foundInvestment);
     } catch (error) {
       console.error(error);
       res.status(500).json({
-        message: `Failed to get expense: ${error.message}`,
+        message: `Failed to get investment: ${error.message}`,
       });
     }
   })
@@ -138,21 +111,22 @@ router
       return res.status(400).json({ message: `Sent id : ${id} is invalid.` });
     }
 
-    const { category, amount, date } = req.body;
+    const { asset_type, amount, purchase_date } = req.body;
 
-    if (!category || !amount || !date) {
+    if (!asset_type || !amount || !purchase_date) {
       return res.status(400).json({
-        message: "Send all required fields (category, amount, date)",
+        message: "Send all required fields (asset type, amount, purchase date)",
       });
     }
-
+    
     try {
-      const [affectedRows, updatedExpense] = await Expense.update(
+      const [affectedRows, updatedInvestment] = await Investment.update(
         {
           user_id: req.user.id,
-          category,
+          asset_type,
           amount,
-          date,
+          purchase_date,
+          current_value: req.body.current_value || null,
           description: req.body.description || null,
         },
         {
@@ -167,17 +141,17 @@ router
       if (!affectedRows) {
         return res
           .status(404)
-          .json({ message: `Expense with id : ${id} not found` });
+          .json({ message: `Investment with id : ${id} not found` });
       }
 
       res.json({
-        message: `${affectedRows} expense(s) updated`,
-        data: updatedExpense[0],
+        message: `${affectedRows} investment(s) updated`,
+        data: updatedInvestment[0],
       });
     } catch (error) {
       console.error(error);
       res.status(500).json({
-        message: `Failed to update expense : ${error.message}`,
+        message: `Failed to update investment : ${error.message}`,
       });
     }
   })
@@ -192,7 +166,7 @@ router
     }
 
     try {
-      const result = await Expense.destroy({
+      const result = await Investment.destroy({
         where: {
           user_id: req.user.id,
           id,
@@ -202,16 +176,18 @@ router
       if (!result) {
         return res
           .status(404)
-          .json({ message: `Expense with id : ${id} not found` });
+          .json({ message: `Investment with id : ${id} not found` });
       }
 
-      return res.json({ message: "Expense deleted successfully" });
+      return res.json({ message: "Investment deleted successfully" });
     } catch (error) {
       console.error(error);
       return res
         .json(500)
-        .json({ message: `Failed to delete expense : ${error.message}` });
+        .json({ message: `Failed to delete investment : ${error.message}` });
     }
   });
+
+router.route("/filter").get(async (req, res) => {});
 
 export default router;
